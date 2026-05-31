@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scramjet Web Proxy</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --border: #2a2d3a;
+      --accent: #6366f1;
+      --accent-hover: #4f52e0;
+      --text: #e2e4f0;
+      --text-muted: #8b8fa8;
+      --success: #22c55e;
+      --error: #ef4444;
+      --radius: 12px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .container {
+      width: 100%;
+      max-width: 640px;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+    .logo {
+      font-size: 3rem;
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+    }
+    .search-form {
+      display: flex;
+      gap: 0.75rem;
+    }
+    .search-input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      color: var(--text);
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-input:focus {
+      border-color: var(--accent);
+    }
+    .search-input::placeholder {
+      color: var(--text-muted);
+    }
+    .btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      white-space: nowrap;
+    }
+    .btn:hover { background: var(--accent-hover); }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status {
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      display: none;
+    }
+    .status.show { display: block; }
+    .status.loading { background: rgba(99,102,241,0.15); color: var(--accent); border: 1px solid rgba(99,102,241,0.3); }
+    .status.success { background: rgba(34,197,94,0.15); color: var(--success); border: 1px solid rgba(34,197,94,0.3); }
+    .status.error { background: rgba(239,68,68,0.15); color: var(--error); border: 1px solid rgba(239,68,68,0.3); }
+    .quick-links {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+    }
+    .quick-link {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.6rem 0.9rem;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .quick-link:hover {
+      color: var(--text);
+      border-color: var(--accent);
+      background: rgba(99,102,241,0.08);
+    }
+    .section-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+    .info-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+    }
+    .info-card .icon { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    .info-card .label { font-size: 0.75rem; color: var(--text-muted); }
+    .info-card .value { font-size: 0.9rem; font-weight: 600; color: var(--text); }
+    footer {
+      margin-top: 2rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    .proxy-frame {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: none;
+      z-index: 100;
+    }
+    .frame-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 48px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: none;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0 1rem;
+      z-index: 101;
+    }
+    .frame-bar.visible {
+      display: flex;
+    }
+    .frame-url {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.25rem 0.75rem;
+      color: var(--text);
+      font-size: 0.875rem;
+      outline: none;
+    }
+    .frame-url:focus { border-color: var(--accent); }
+    .frame-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.25rem 0.75rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.875rem;
+      transition: all 0.2s;
+    }
+    .frame-btn:hover { color: var(--text); border-color: var(--accent); }
+    .frame-btn.close { border-color: rgba(239,68,68,0.5); }
+    .frame-btn.close:hover { background: rgba(239,68,68,0.15); color: var(--error); }
+  </style>
+</head>
+<body>
+  <!-- Top bar for iframe navigation -->
+  <div class="frame-bar" id="frameBar">
+    <button class="frame-btn" onclick="frameBack()">← Back</button>
+    <input class="frame-url" id="frameUrlInput" placeholder="Enter URL..." onkeydown="if(event.key==='Enter') frameNavigate(this.value)" />
+    <button class="frame-btn" onclick="frameNavigate(document.getElementById('frameUrlInput').value)">Go</button>
+    <button class="frame-btn close" onclick="closeFrame()">✕ Close</button>
+  </div>
+
+  <!-- Proxy iframe -->
+  <iframe class="proxy-frame" id="proxyFrame" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"></iframe>
+
+  <!-- Main UI -->
+  <div class="container" id="mainUI">
+    <header>
+      <div class="logo">🌐</div>
+      <h1>Scramjet Proxy</h1>
+      <p class="subtitle">Bypass restrictions. Browse freely.</p>
+    </header>
+
+    <div class="card">
+      <div class="section-title">Browse the Web</div>
+      <div class="search-form">
+        <input
+          class="search-input"
+          id="urlInput"
+          type="text"
+          placeholder="Enter a URL or search term..."
+          onkeydown="if(event.key==='Enter') navigate()"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button class="btn" id="goBtn" onclick="navigate()">Go</button>
+      </div>
+      <div class="status" id="status"></div>
+
+      <div style="margin-top:1.25rem">
+        <div class="section-title">Quick Links</div>
+        <div class="quick-links">
+          <div class="quick-link" onclick="proxyGo('https://google.com')">🔍 Google</div>
+          <div class="quick-link" onclick="proxyGo('https://youtube.com')">▶️ YouTube</div>
+          <div class="quick-link" onclick="proxyGo('https://reddit.com')">🤖 Reddit</div>
+          <div class="quick-link" onclick="proxyGo('https://wikipedia.org')">📚 Wikipedia</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-card">
+        <div class="icon">🔒</div>
+        <div class="value">Encrypted</div>
+        <div class="label">Wisp Transport</div>
+      </div>
+      <div class="info-card">
+        <div class="icon">⚡</div>
+        <div class="value" id="versionDisplay">v2.0.67</div>
+        <div class="label">Scramjet Version</div>
+      </div>
+      <div class="info-card">
+        <div class="icon" id="swStatusIcon">⏳</div>
+        <div class="value" id="swStatusValue">Loading</div>
+        <div class="label">Service Worker</div>
+      </div>
+    </div>
+
+    <footer>
+      Powered by <a href="https://github.com/MercuryWorkshop/scramjet" target="_blank">Scramjet</a>
+      &mdash; an open-source web proxy
+    </footer>
+  </div>
+
+  <script>
+    // ─── CONFIG ─────────────────────────────────────────────
+    const SCRAMJET_PREFIX = "/scramjet~/";
+    const WISP_PATH = "/wisp/";
+
+    // XOR codec (matches scramjet default; both sides must agree)
+    const codec = {
+      encode: (str) => btoa(
+        encodeURIComponent(str)
+          .split("")
+          .map((c) => String.fromCharCode(c.charCodeAt(0) ^ 2))
+          .join("")
+      ),
+      decode: (str) => {
+        try {
+          return decodeURIComponent(
+            atob(str)
+              .split("")
+              .map((c) => String.fromCharCode(c.charCodeAt(0) ^ 2))
+              .join("")
+          );
+        } catch { return null; }
+      },
+    };
+
+    // ─── STATE ───────────────────────────────────────────────
+    let swReady = false;
+    let swRegistration = null;
+    let initialized = false;
+
+    // ─── DOM HELPERS ────────────────────────────────────────
+    const $status   = document.getElementById("status");
+    const $urlInput = document.getElementById("urlInput");
+    const $goBtn    = document.getElementById("goBtn");
+    const $swStatusIcon  = document.getElementById("swStatusIcon");
+    const $swStatusValue = document.getElementById("swStatusValue");
+
+    function showStatus(msg, type = "loading") {
+      $status.textContent = msg;
+      $status.className = `status show ${type}`;
+    }
+    function hideStatus() {
+      $status.className = "status";
+    }
+
+    // ─── INIT ───────────────────────────────────────────────
+    async function init() {
+      if (!("serviceWorker" in navigator)) {
+        showStatus("⚠️ Service Workers not supported in this browser.", "error");
+        $swStatusIcon.textContent  = "❌";
+        $swStatusValue.textContent = "Not supported";
+        $goBtn.disabled = true;
+        return;
+      }
+
+      showStatus("Registering service worker…", "loading");
+
+      try {
+        swRegistration = await navigator.serviceWorker.register(
+          "/scramjet/scramjet.js",
+          { scope: "/", updateViaCache: "none" }
+        );
+
+        // Wait for the SW to become active
+        await navigator.serviceWorker.ready;
+
+        // Send config to the SW
+        const swTarget =
+          swRegistration.active ||
+          swRegistration.installing ||
+          swRegistration.waiting;
+
+        if (swTarget) {
+          // NOTE: codec is intentionally omitted — it contains JS functions
+          // which cannot be structured-cloned via postMessage (DataCloneError).
+          // The service worker defines its own XOR codec internally.
+          swTarget.postMessage({
+            type: "init",
+            config: {
+              prefix: SCRAMJET_PREFIX,
+              wispUrl: `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}${WISP_PATH}`,
+              wasm: "/scramjet/scramjet.wasm",
+            },
+          });
+        }
+
+        swReady = true;
+        initialized = true;
+        $swStatusIcon.textContent  = "✅";
+        $swStatusValue.textContent = "Ready";
+        showStatus("Service worker ready. Paste a URL or search below.", "success");
+        setTimeout(hideStatus, 3000);
+      } catch (err) {
+        console.error("SW registration failed:", err);
+        showStatus(`Service worker error: ${err.message}`, "error");
+        $swStatusIcon.textContent  = "❌";
+        $swStatusValue.textContent = "Error";
+      }
+    }
+
+    // ─── NAVIGATION ─────────────────────────────────────────
+    function resolveUrl(input) {
+      input = input.trim();
+      if (!input) return null;
+      // If it looks like a URL, add https:// if missing
+      if (/^https?:\/\//i.test(input)) return input;
+      // If it has a dot and no spaces, treat as URL
+      if (/^[^\s]+\.[^\s]+$/.test(input) && !input.includes(" "))
+        return "https://" + input;
+      // Otherwise, do a Google search
+      return `https://www.google.com/search?q=${encodeURIComponent(input)}`;
+    }
+
+    function proxyUrl(url) {
+      return SCRAMJET_PREFIX + codec.encode(url);
+    }
+
+    function navigate() {
+      const raw = $urlInput.value;
+      const url = resolveUrl(raw);
+      if (!url) return;
+      proxyGo(url);
+    }
+
+    function proxyGo(url) {
+      if (!swReady) {
+        showStatus("⏳ Service worker is not ready yet. Please wait.", "error");
+        return;
+      }
+      openFrame(url);
+    }
+
+    // ─── IFRAME MANAGEMENT ───────────────────────────────────
+    const $frame    = document.getElementById("proxyFrame");
+    const $frameBar = document.getElementById("frameBar");
+    const $mainUI   = document.getElementById("mainUI");
+    const $frameUrl = document.getElementById("frameUrlInput");
+
+    function openFrame(url) {
+      const proxied = proxyUrl(url);
+      $frameUrl.value = url;
+      $frame.src = proxied;
+      $frame.style.display = "block";
+      $frame.style.top = "48px";
+      $frameBar.classList.add("visible");
+      $mainUI.style.display = "none";
+    }
+
+    function closeFrame() {
+      $frame.style.display = "none";
+      $frame.src = "about:blank";
+      $frameBar.classList.remove("visible");
+      $mainUI.style.display = "flex";
+      $mainUI.style.flexDirection = "column";
+      $mainUI.style.alignItems = "center";
+      $mainUI.style.justifyContent = "center";
+    }
+
+    function frameNavigate(input) {
+      const url = resolveUrl(input);
+      if (!url) return;
+      $frameUrl.value = url;
+      $frame.src = proxyUrl(url);
+    }
+
+    function frameBack() {
+      $frame.contentWindow?.history?.back();
+    }
+
+    // Show version from scramjet bundle if loaded
+    try {
+      if (typeof $scramjet !== "undefined" && $scramjet.versionInfo) {
+        document.getElementById("versionDisplay").textContent =
+          "v" + $scramjet.versionInfo.version;
+      }
+    } catch {}
+
+    // Start
+    init();
+  </script>
+</body>
+</html>
